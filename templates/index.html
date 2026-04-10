@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OllaNews</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #e5e5e5;
+            --paper: #ffffff;
+            --ink: #121212;
+            --border: #a1a1a1;
+            --shadow: 6px 6px 0px var(--border);
+            --shadow-active: 10px 10px 0px var(--ink);
+        }
+
+        * { box-sizing: border-box; }
+        body { 
+            background-color: var(--bg); 
+            color: var(--ink); 
+            font-family: 'JetBrains Mono', monospace; 
+            margin: 0; 
+            overflow-x: hidden;
+            transition: background 0.5s ease;
+        }
+
+        .pressable {
+            background: var(--paper);
+            border: 3px solid var(--ink);
+            box-shadow: var(--shadow);
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            outline: none;
+            font-family: inherit;
+        }
+        .pressable:hover, .pressable:focus {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-active);
+        }
+        .pressable:active {
+            transform: translateY(2px);
+            box-shadow: 2px 2px 0px var(--ink);
+        }
+
+        .landing-view {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: all 0.6s ease;
+        }
+        .landing-view.shifted { height: auto; padding-top: 60px; justify-content: flex-start; }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 10vw, 5.5rem);
+            margin: 0;
+            text-transform: uppercase;
+            border-bottom: 8px double var(--ink);
+        }
+
+        .newspaper-input {
+            width: 100%;
+            max-width: 650px;
+            padding: 22px 35px;
+            font-size: 1.3rem;
+            border-radius: 60px;
+            margin-top: 40px;
+        }
+
+        #results {
+            width: 100%;
+            max-width: 1200px;
+            margin: 60px auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 30px;
+            padding: 20px;
+        }
+
+        .article-card {
+            padding: 25px;
+            text-align: left;
+            animation: slideUp 0.5s ease forwards;
+        }
+        .article-card h3 { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin: 0; }
+        .article-card.hidden { display: none; }
+
+        /* Shared Modal Styles */
+        .modal-view {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            z-index: 1000;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: var(--paper);
+            max-width: 850px;
+            margin: 0 auto;
+            border: 3px solid var(--ink);
+            box-shadow: 15px 15px 0 var(--border);
+            padding: 60px;
+            position: relative;
+        }
+
+        .close-btn { position: absolute; top: 20px; right: 20px; font-weight: bold; padding: 5px 15px; }
+
+        .raw-body {
+            font-size: 1rem;
+            line-height: 1.8;
+            margin: 40px 0;
+            white-space: pre-wrap;
+            border-top: 1px solid #ddd;
+            padding-top: 30px;
+        }
+
+        .ai-section {
+            background: #f8f8f8;
+            border: 2px dashed var(--ink);
+            padding: 30px;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid #ddd; border-top: 5px solid var(--ink);
+            border-radius: 50%; display: inline-block;
+            animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+
+        /* Floating Bookmark Button */
+        #bookmarkTrigger {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+
+        .archive-item {
+            border-bottom: 2px solid var(--ink);
+            padding: 20px 0;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+        .streaming-text { line-height: 1.6; white-space: pre-wrap; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <button id="bookmarkTrigger" class="pressable" onclick="openArchive()" title="View Saved Summaries">🔖</button>
+
+    <div id="archiveView" class="modal-view">
+        <div class="modal-content">
+            <button class="pressable close-btn" onclick="closeArchive()">CLOSE [X]</button>
+            <h1 style="font-size: 2rem; border-bottom: 4px solid var(--ink); margin-bottom: 30px;">THE ARCHIVE</h1>
+            <div id="archiveList">
+                <p>No dispatches saved yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="readerView" class="modal-view">
+        <div class="modal-content">
+            <button class="pressable close-btn" onclick="closeReader()">CLOSE [X]</button>
+            <h1 id="readerTitle" style="font-size: 2.5rem; border: none;">Headline</h1>
+
+            <div id="aiContainer" class="ai-section">
+                <button id="sumBtn" class="pressable" onclick="triggerAI()" style="padding: 15px 30px; font-weight: bold;">SUMMARIZE WITH AI</button>
+                <div id="aiOutput" style="display: none;">
+                    <div id="aiStatus"><div class="spinner"></div><p>TYPEWRITER ENGAGED...</p></div>
+                    <div class="summary-result">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="text-transform:uppercase; margin:0;">The AI Breakdown</h4>
+                            <button id="saveBtn" class="pressable" onclick="saveArticle()" style="padding: 5px 10px; font-size: 0.8rem;">[SAVE TO ARCHIVE]</button>
+                        </div>
+                        <div id="streamingText" class="streaming-text"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="readerBody" class="raw-body">Content goes here...</div>
+        </div>
+    </div>
+
+    <div id="landing" class="landing-view">
+        <div style="text-align: center;">
+            <h1>OllaNews</h1>
+            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px;">
+                <span>Better News Feed | by Pranav Desai and Sadiyah Shaik</span>
+            </div>
+        </div>
+
+        <input type="text" id="topicInput" class="newspaper-input pressable" placeholder="SEARCH TOPIC..." onkeydown="if(event.key === 'Enter') searchNews()">
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let currentArticle = null;
+        let currentRawText = "";
+
+        async function searchNews() {
+            const topic = document.getElementById('topicInput').value;
+            if(!topic) return;
+
+            document.getElementById('landing').classList.add('shifted');
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">DISPATCHING REPORTERS...</p>';
+
+            const formData = new FormData();
+            formData.append('topic', topic);
+            
+            const response = await fetch('/search', { method: 'POST', body: formData });
+            const articles = await response.json();
+            
+            resultsDiv.innerHTML = '';
+            articles.forEach((art, index) => {
+                const card = document.createElement('div');
+                card.className = 'article-card pressable';
+                card.id = `card-${index}`;
+                card.innerHTML = `<h3>${art.title}</h3><p style="font-size:0.7rem; margin-top:15px;">LOADING PREVIEW...</p>`;
+                card.onclick = () => openReader(art, index);
+                resultsDiv.appendChild(card);
+                autoScrape(art, index);
+            });
+        }
+
+        async function autoScrape(articleData, index) {
+            const card = document.getElementById(`card-${index}`);
+            const response = await fetch('/get_text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(articleData)
+            });
+            const data = await response.json();
+
+            if (!data.raw_text) {
+                card.classList.add('hidden');
+            } else {
+                card.setAttribute('data-raw', data.raw_text);
+                card.querySelector('p').innerHTML = data.raw_text.substring(0, 150) + "... [READ MORE]";
+            }
+        }
+
+        function openReader(art, index) {
+            currentArticle = art;
+            currentArticle.index = index;
+            const card = document.getElementById(`card-${index}`);
+            currentRawText = card.getAttribute('data-raw') || "";
+            const cachedSummary = card.getAttribute('data-summary');
+            
+            document.getElementById('readerTitle').innerText = art.title;
+            document.getElementById('readerBody').innerText = currentRawText;
+            
+            const sumBtn = document.getElementById('sumBtn');
+            const output = document.getElementById('aiOutput');
+            const textTarget = document.getElementById('streamingText');
+            const status = document.getElementById('aiStatus');
+            const saveBtn = document.getElementById('saveBtn');
+
+            if (cachedSummary) {
+                sumBtn.style.display = 'none';
+                output.style.display = 'block';
+                status.style.display = 'none';
+                textTarget.innerHTML = cachedSummary;
+                saveBtn.innerText = card.getAttribute('data-saved') === 'true' ? '[ARCHIVED]' : '[SAVE TO ARCHIVE]';
+            } else {
+                sumBtn.style.display = 'inline-block';
+                output.style.display = 'none';
+                textTarget.innerHTML = "";
+            }
+
+            document.getElementById('readerView').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeReader() {
+            document.getElementById('readerView').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        async function triggerAI() {
+            const textTarget = document.getElementById('streamingText');
+            const status = document.getElementById('aiStatus');
+            const output = document.getElementById('aiOutput');
+            const sumBtn = document.getElementById('sumBtn');
+
+            sumBtn.style.display = 'none';
+            output.style.display = 'block';
+            status.style.display = 'block';
+            textTarget.innerHTML = "";
+
+            const response = await fetch('/summarize_stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...currentArticle, raw_text: currentRawText })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullSummary = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                lines.forEach(line => {
+                    if (line.startsWith('data: ')) {
+                        status.style.display = 'none';
+                        const content = line.replace('data: ', '');
+                        fullSummary += content;
+                        textTarget.innerHTML = fullSummary;
+                    }
+                });
+            }
+            
+            const card = document.getElementById(`card-${currentArticle.index}`);
+            if(card) card.setAttribute('data-summary', fullSummary);
+        }
+
+        async function saveArticle() {
+            const textTarget = document.getElementById('streamingText');
+            const saveBtn = document.getElementById('saveBtn');
+            const summary = textTarget.innerHTML;
+
+            if (!summary) return;
+
+            const payload = {
+                title: currentArticle.title,
+                link: currentArticle.link,
+                summary: summary,
+                source: "Web"
+            };
+
+            const resp = await fetch('/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
+                saveBtn.innerText = "[ARCHIVED]";
+                const card = document.getElementById(`card-${currentArticle.index}`);
+                if(card) card.setAttribute('data-saved', 'true');
+            }
+        }
+
+        // Archive Functions
+        async function openArchive() {
+            const list = document.getElementById('archiveList');
+            list.innerHTML = "Fetching archives...";
+            document.getElementById('archiveView').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+
+            const resp = await fetch('/get_bookmarks'); 
+            const saved = await resp.json();
+
+            list.innerHTML = "";
+            if (saved.length === 0) {
+                list.innerHTML = "<p>Archive is empty.</p>";
+                return;
+            }
+
+            saved.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'archive-item';
+                div.innerHTML = `
+                    <h3 style="font-family:'Playfair Display';">${item.title}</h3>
+                    <p style="font-size:0.9rem; color:#555;">${item.summary}</p>
+                    <a href="${item.link}" target="_blank" style="font-size:0.7rem; color:var(--ink);">[SOURCE]</a>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function closeArchive() {
+            document.getElementById('archiveView').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    </script>
+</body>
+</html>
