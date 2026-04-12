@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from flask import Flask, render_template, request, jsonify, Response
-import scraper
-import summarizer
-import storage
+from ollanews import scraper
+from ollanews import summarizer
+from ollanews import storage
 
 app = Flask(__name__)
 
@@ -46,13 +46,17 @@ def summarize_stream():
 @app.route('/save', methods=['POST'])
 def save():
     data = request.get_json()
-    success = storage.save_bookmark(
+    success = storage.save_to_bookmarks(
         title=data.get('title'),
         link=data.get('link'),
         summary=data.get('summary'),
         source=data.get('source', 'Web')
     )
     return jsonify({"status": "success" if success else "error"})
+
+@app.route('/get_bookmarks')
+def get_bookmarks():
+    return jsonify(storage.get_all_bookmarks())
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

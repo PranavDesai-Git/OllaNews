@@ -1,0 +1,5 @@
+flask
+trafilatura
+pygooglenews
+googlenewsdecoder
+ollama

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "Starting OllaNews..."
+
+# Change to project root
+cd "$(dirname "$0")/.."
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Open browser
+python -m webbrowser http://localhost:5000 &
+
+# Run the Flask app
+python app.py

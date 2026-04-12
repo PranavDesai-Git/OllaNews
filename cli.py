@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import scraper
-import summarizer
-import storage
+from ollanews import scraper
+from ollanews import summarizer
+from ollanews import storage
 import sys
 
 def main():
